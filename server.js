@@ -2,27 +2,45 @@ const config = require('./config.json');
 const chalk = require('chalk');
 const exec = require('child_process').exec;
 const fastify = require('fastify')({ logger: false });
+const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+const win32 = 'win32';
+const linux = 'linux';
 
 fastify.post('/api/ping/:ip', function (request, reply) {
   authAction(request.ip);
   let n = 3;
   if (request.query.n) {
-    if (request.query.n < 1) {
-      reply.code(400);
-      throw new Error();
-    }
-    n = request.query.n;
+    n = checkEchoRequestsCount(request.query.n, reply);
   }
-  var ipformat = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  if (!request.params.ip.match(ipformat)) {
+  const ip = request.params.ip;
+  validateIp(ip, reply);
+  cliMsg(`${ip} ping`);
+
+  const platform = process.platform;
+  if (platform === win32) {
+    exec(`ping -n ${n} -w 1000 ${ip}`, (error, stdout, stderr) => { reply.send(stdout) });
+  } else if (platform === linux) {
+    exec(`ping -O ${ip} -W 1000 -c ${n}`, (error, stdout, stderr) => { reply.send(stdout) });
+  }
+});
+
+checkEchoRequestsCount = (n, reply) => {
+  if (n < 1 || n > 100) {
     reply.code(400);
     throw new Error();
   }
-  cliMsg(`${request.params.ip} ping`);
-  exec(`ping -n ${n} ${request.params.ip}`, (error, stdout, stderr) => { reply.send(stdout) });
-});
+  return n;
+}
 
-function cliMsg(msg, type) {
+validateIp = (ip, reply) => {
+  var ipformat = ipRegex;
+  if (!ip.match(ipformat)) {
+    reply.code(400);
+    throw new Error();
+  }
+}
+
+cliMsg = (msg, type) => {
   if (type !== 1) {
     console.log(chalk.black.bgWhite("server-api") + " " + msg)
   } else {
@@ -30,7 +48,7 @@ function cliMsg(msg, type) {
   }
 }
 
-function authAction(ip) {
+authAction = (ip) => {
   if (config.allowedHosts.includes(ip)) {
     return true;
   }
