@@ -20,7 +20,7 @@ fastify.post('/api/ping/:ip', function (request, reply) {
   if (platform === win32) {
     exec(`ping -n ${n} -w 1000 ${ip}`, (error, stdout, stderr) => { reply.send(stdout) });
   } else if (platform === linux) {
-    exec(`ping -O ${ip} -W 1 -c ${n}`, (error, stdout, stderr) => { reply.send(stdout) });
+    exec(`/bin/ping -O ${ip} -W 1 -c ${n}`, (error, stdout, stderr) => { reply.send(stdout) });
   }
 });
 
